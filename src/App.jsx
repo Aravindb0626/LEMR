@@ -10,7 +10,7 @@ export default function App() {
   const [result, setResult] = useState(undefined);
 
   useEffect(() => {
-    fetch("/public/lemr_simulated_neighbors.csv")
+    fetch("/lemr_simulated_neighbors.csv")
       .then(res => res.text())
       .then(text => {
         const lines = text.trim().split("\n").slice(1);
