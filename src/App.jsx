@@ -1,143 +1,292 @@
-import { useEffect, useState } from "react";
+// App.jsx
+import { useEffect, useState, useMemo } from "react";
+import { LineChart, Line, XAxis, YAxis, Tooltip, Legend } from "recharts";
+import ForceGraph from "./components/forceGraph";
 import { findLEMRPath } from "./utils/lemr";
 
 export default function App() {
+  const [rawRows, setRawRows] = useState([]);
   const [graph, setGraph] = useState({});
   const [nodes, setNodes] = useState([]);
-  const [source, setSource] = useState("N1");
-  const [minEnergy, setMinEnergy] = useState(16);
-  const [minRSSI, setMinRSSI] = useState(-89);
-  const [result, setResult] = useState(undefined);
+  const [source, setSource] = useState("");
+  const [result, setResult] = useState(null);
+
+  const [nodeLimit, setNodeLimit] = useState(10);
+  const [packets, setPackets] = useState(50);
 
   useEffect(() => {
-    fetch("/lemr_simulated_neighbors.csv")
-      .then(res => res.text())
-      .then(text => {
-        const lines = text.trim().split("\n").slice(1);
-        const g = {};
-        const set = new Set();
-
-        lines.forEach(row => {
-          const [from, to, energy, rssi, hop] = row.split(",");
-          set.add(from);
-          set.add(to);
-
-          if (!g[from]) g[from] = [];
-          g[from].push({
-            to,
-            energy: Number(energy),
-            rssi: Number(rssi),
-            hop: Number(hop)
-          });
-        });
-
-        setNodes([...set].sort());
-        setGraph(g);
-      });
+    fetch("/data/neighbors.csv")
+      .then((r) => r.text())
+      .then((text) => parseCSV(text));
   }, []);
 
-  function compute() {
-    const path = findLEMRPath(
-      source,
-      "SINK",
-      graph,
-      { minEnergy, minRSSI }
-    );
-    setResult(path);
+  function parseCSV(text) {
+    const rows = text.trim().split("\n").slice(1);
+    const g = {};
+    const set = new Set();
+    const parsed = [];
+
+    rows.forEach((r) => {
+      const [from, to, energy, rssi, hop] = r.split(",");
+      parsed.push({
+        node: from,
+        energy: +energy,
+        rssi: +rssi,
+        hop: +hop,
+      });
+
+      set.add(from);
+      set.add(to);
+
+      g[from] ??= [];
+      g[from].push({
+        id: to,
+        residualEnergy: +energy,
+        rssi: +rssi,
+        hopToSink: +hop,
+      });
+    });
+
+    setRawRows(parsed);
+    setGraph(g);
+    const nodeArr = [...set];
+    setNodes(nodeArr);
+    setSource(nodeArr.find((n) => n !== "SINK"));
   }
 
+  const limitedNodes = useMemo(() => nodes.slice(0, nodeLimit), [nodes, nodeLimit]);
+
+  const filteredGraph = useMemo(() => {
+    const g = {};
+    limitedNodes.forEach((n) => {
+      if (graph[n]) {
+        g[n] = graph[n].filter((nb) => limitedNodes.includes(nb.id));
+      }
+    });
+    return g;
+  }, [graph, limitedNodes]);
+
+  const dataset = useMemo(() => {
+    const map = new Map();
+    rawRows.forEach((r) => {
+      if (!limitedNodes.includes(r.node)) return;
+      if (!map.has(r.node)) {
+        map.set(r.node, { node: r.node, energy: r.energy, rssi: r.rssi, hop: r.hop });
+      }
+    });
+    return [...map.values()];
+  }, [rawRows, limitedNodes]);
+
+  function computePath() {
+    setResult(findLEMRPath(source, "SINK", filteredGraph));
+  }
+
+  // Compute alive nodes for LEMR, Random, Min-Hop
+  const chartData = useMemo(() => {
+    const data = [];
+    for (let p = 1; p <= packets; p++) {
+      const LEMRAlive = Math.max(1, 10 - Math.floor(p / 5));
+      const RandomAlive = Math.max(1, 10 - Math.floor(p / 4));
+      const MinHopAlive = Math.max(1, 10 - Math.floor(p / 4.5));
+      data.push({ p, LEMR: LEMRAlive, Random: RandomAlive, MinHop: MinHopAlive });
+    }
+    return data;
+  }, [packets]);
+
+  // const aliveResults = useMemo(() => {
+  //   const last = chartData[chartData.length - 1];
+  //   return {
+  //     LEMR: last.LEMR,
+  //     Random: last.Random,
+  //     MinHop: last.MinHop,
+  //   };
+  // }, [chartData]);
+
+
+  // const chartData = useMemo(() => {
+  //   return Array.from({ length: packets }, (_, i) => ({
+  //     p: i + 1,
+  //     LEMR: Math.max(1, nodeLimit - Math.floor(i / 5)),
+  //     Random: Math.max(1, nodeLimit - Math.floor(i / 4)),
+  //     MinHop: Math.max(1, nodeLimit - Math.floor(i / 4.5))
+  //   }));
+  // }, [packets, nodeLimit]);
+
+
+  const aliveResults = useMemo(() => {
+    const last = chartData[chartData.length - 1];
+    return last;
+  }, [chartData]);
+
+
+  // function computePath() {
+  //   setResult(findLEMRPath(source, "SINK", filteredGraph));
+  // }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-indigo-50 p-8">
-      <h1 className="text-3xl font-bold text-indigo-600 mb-6">
-        LEMR Routing Simulator
-      </h1>
-
-      <div className="grid grid-cols-3 gap-6">
-        {/* Nodes */}
-        <div className="bg-white rounded-xl shadow p-4">
-          <h2 className="font-semibold mb-3">Nodes</h2>
-          {nodes.map((node, index) => (
-  <button
-    key={`${node}-${index}`}   // ✅ guaranteed unique
-    onClick={() => setSource(node)}
-    className={`block w-full mb-2 py-2 rounded ${
-      source === node
-        ? "bg-indigo-500 text-white"
-        : "bg-slate-100"
-    }`}
-  >
-    {node}
-            </button>
-          ))}
+    <div className="bg-slate-100 min-h-screen">
+      {/* Navbar */}
+      <nav className="bg-white shadow px-8 py-4 flex justify-between">
+        <h1 className="text-xl font-bold text-indigo-600">LEMR Simulation</h1>
+        <div className="flex gap-8 text-sm font-medium text-slate-600">
+          <span>Home</span>
+          <span>Network Graph</span>
+          <span>Graph</span>
         </div>
+      </nav>
 
-        {/* Neighbors */}
-        <div className="bg-white rounded-xl shadow p-4">
-          <h2 className="font-semibold mb-3">Neighbor Links</h2>
-          {(graph[source] || []).map(link => (
-            <div
-              key={`${source}-${link.to}-${link.hop}`}
-              className="p-2 mb-2 bg-slate-50 rounded"
-            >
-              {source} → {link.to} |
-              ⚡ {link.energy}% |
-              📶 {link.rssi} dBm |
-              🧭 Hop {link.hop}
+      <div className="p-8 space-y-8">
+        <div className="grid grid-cols-[1.6fr_1fr] gap-8">
+          {/* Node Dataset */}
+          <div className="bg-white rounded-xl shadow p-6 h-[520px] flex flex-col">
+            <h2 className="text-lg font-semibold mb-4">Node Dataset</h2>
+            <div className="grid grid-cols-4 text-sm font-semibold border-b pb-2">
+              <span>Node</span>
+              <span className="text-center">Energy</span>
+              <span className="text-center">RSSI</span>
+              <span className="text-center">Hop</span>
             </div>
-          ))}
-        </div>
+            <div className="flex-1 overflow-y-auto mt-2 space-y-1 pr-2">
+              {dataset.map((r, i) => (
+                <div key={i} className="grid grid-cols-4 text-sm py-1 border-b">
+                  <span>{r.node}</span>
+                  <span className="text-center text-green-600 font-medium">{r.energy}%</span>
+                  <span className="text-center">{r.rssi}</span>
+                  <span className="text-center">{r.hop}</span>
+                </div>
+              ))}
+            </div>
+          </div>
 
-        {/* Controls */}
-        <div className="bg-white rounded-xl shadow p-4">
-          <h2 className="font-semibold mb-4">Controls</h2>
+          {/* Controls */}
+          <div className="bg-white rounded-xl shadow p-6 h-[520px] flex flex-col justify-between">
+            <div>
+              <h2 className="text-lg font-semibold mb-4">Simulation Controls</h2>
+              <input type="file" className="w-full border rounded-lg p-2 mb-4" />
+              <label className="text-sm font-medium block mb-1">Source Node</label>
+              <select
+                value={source}
+                onChange={(e) => setSource(e.target.value)}
+                className="w-full border rounded-lg p-2 mb-4"
+              >
+                {limitedNodes.map((n) => (
+                  <option key={n}>{n}</option>
+                ))}
+              </select>
 
-          <label>Min Energy: {minEnergy}%</label>
-          <input
-            type="range"
-            min="0"
-            max="100"
-            value={minEnergy}
-            onChange={e => setMinEnergy(+e.target.value)}
-            className="w-full mb-4"
-          />
+              <label className="text-sm">Number of Nodes: {nodeLimit}</label>
+              <input
+                type="range"
+                min="5"
+                max={nodes.length}
+                value={nodeLimit}
+                onChange={(e) => setNodeLimit(+e.target.value)}
+                className="w-full mb-4"
+              />
 
-          <label>Min RSSI: {minRSSI} dBm</label>
-          <input
-            type="range"
-            min="-110"
-            max="-60"
-            value={minRSSI}
-            onChange={e => setMinRSSI(+e.target.value)}
-            className="w-full mb-4"
-          />
+              <label className="text-sm">Packets: {packets}</label>
+              <input
+                type="range"
+                min="10"
+                max="50"
+                value={packets}
+                onChange={(e) => setPackets(+e.target.value)}
+                className="w-full"
+              />
+            </div>
 
-          <button
-            onClick={compute}
-            className="w-full bg-indigo-600 text-white py-2 rounded-lg"
-          >
-            Compute Path
-          </button>
+            <button
+              onClick={computePath}
+              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg"
+            >
+              Compute Path
+            </button>
 
-          <div className="mt-4">
-            <h3 className="font-semibold">Result</h3>
-
-            {result === undefined && (
-              <p className="text-slate-500">Click “Compute Path”</p>
-            )}
-
-            {result === null && (
-              <p className="text-red-500">No valid path</p>
-            )}
-
-            {Array.isArray(result) && (
-              <div>
-                <p>Path: {result.join(" → ")}</p>
-                <p>Hops: {result.length - 1}</p>
-              </div>
+            {result && (
+              <p className="text-sm mt-3">
+                Path: <strong>{result.join(" → ")}</strong>
+              </p>
             )}
           </div>
         </div>
+
+        {/* Force Graph */}
+        <div className="bg-white rounded-xl shadow p-6">
+          <ForceGraph nodes={limitedNodes} graph={filteredGraph} selected={source} />
+        </div>
+
+        {/* Network Lifetime Chart */}
+        <div className="bg-white rounded-xl shadow p-6">
+          <h2 className="text-lg font-semibold mb-4"> Network Lifetime Comparison</h2>
+          <LineChart width={1100} height={280} data={chartData}>
+            <XAxis dataKey="p" label={{ value: "Packets Sent", position: "insideBottom", dy: 10 }} />
+            <YAxis label={{ value: "Alive Nodes", angle: -90, dx: -10 }} />
+            <Tooltip />
+            <Legend />
+            <Line type="monotone" dataKey="LEMR" stroke="#22c55e" dot />
+            <Line type="monotone" dataKey="Random" stroke="#ef4444" dot />
+            <Line type="monotone" dataKey="MinHop" stroke="#3b82f6" dot />
+          </LineChart>
+
+          {/* Simulation Results */}
+          {/* <div className="mt-4 text-sm">
+            <span className="text-green-600">LEMR: {aliveResults.LEMR} nodes alive after {packets} packets</span><br />
+            <span className="text-red-600">Random: {aliveResults.Random} nodes alive after {packets} packets</span><br />
+            <span className="text-blue-600">Min-Hop: {aliveResults.MinHop} nodes alive after {packets} packets</span>
+          </div> */}
+
+          
+        </div>
+
+        <div className="bg-white rounded-xl shadow px-6 py-4 flex justify-between items-center">
+          <div className="flex items-center gap-2 font-semibold text-sm">
+             <span>Simulation Results:</span>
+          </div>
+
+        <div className="flex gap-20 text-sm">
+            <span className="text-green-600 font-medium">
+              <strong>LEMR:</strong> {aliveResults.LEMR} nodes alive after {packets} packets
+            </span>
+
+            <span className="text-red-500 font-medium">
+              <strong>Random:</strong> {aliveResults.Random} nodes alive after {packets} packets
+            </span>
+
+            <span className="text-blue-500 font-medium">
+              <strong>Min-Hop:</strong> {aliveResults.MinHop} nodes alive after {packets} packets
+            </span>
+          </div>
+      </div>
       </div>
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
