@@ -1,10 +1,9 @@
 import { useEffect, useState, useMemo, useRef } from "react";
-import { LineChart, Line, XAxis, YAxis, Tooltip, Legend } from "recharts";
+import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, Label } from "recharts";
 import ForceGraph from "./components/forceGraph";
 import { findLEMRPath } from "./utils/lemr";
 
 export default function App() {
-
   const homeRef = useRef(null);
   const topologyRef = useRef(null);
   const lifetimeRef = useRef(null);
@@ -18,15 +17,15 @@ export default function App() {
   const [nodeLimit, setNodeLimit] = useState(10);
   const [packets, setPackets] = useState(50);
 
-   const [uploadedFile, setUploadedFile] = useState(null)
-   const fileInputRef = useRef(null); // 🆕 NEW
-
+  const [uploadedFile, setUploadedFile] = useState(null);
+  const fileInputRef = useRef(null); // 🆕 NEW
 
   useEffect(() => {
     loadDefaultCSV(); // 🔴 CHANGED
   }, []);
 
-  function loadDefaultCSV() { // 🆕 NEW
+  function loadDefaultCSV() {
+    // 🆕 NEW
     fetch("/data/neighbors.csv")
       .then((r) => r.text())
       .then((text) => parseCSV(text));
@@ -67,7 +66,8 @@ export default function App() {
     setSource(nodeArr.find((n) => n !== "SINK"));
   }
 
-  function handleFileChange(e) { // 🆕 NEW
+  function handleFileChange(e) {
+    // 🆕 NEW
     const file = e.target.files[0];
     if (!file) return;
 
@@ -78,7 +78,8 @@ export default function App() {
     reader.readAsText(file);
   }
 
-  function removeFile() { // 🆕 NEW
+  function removeFile() {
+    // 🆕 NEW
     setUploadedFile(null); // 🔴 CHANGED
     fileInputRef.current.value = "";
     loadDefaultCSV(); // 🔴 CHANGED
@@ -141,9 +142,7 @@ export default function App() {
     <div className="bg-slate-100 min-h-screen">
       {/* Navbar */}
       <nav className="fixed top-0 left-0 pt-5 right-0 z-50 bg-white shadow px-8 py-4 flex justify-between">
-        <h1 className="text-xl font-bold text-indigo-600">
-          LEMR Simulation
-        </h1>
+        <h1 className="text-xl font-bold text-indigo-600">LEMR Simulation</h1>
         <div className="flex gap-8 text-sm font-medium text-slate-600">
           <span
             className="hover:text-indigo-600 cursor-pointer"
@@ -175,43 +174,24 @@ export default function App() {
       {/* 🔹 HOME */}
       <div ref={homeRef} className="p-8 pt-23 space-y-8">
         <div className="grid grid-cols-[1.6fr_1fr] gap-8">
-          {/* Node Dataset */}
-          {/* <div className="bg-white rounded-xl shadow p-6 h-[520px] flex flex-col">
-            <h2 className="text-lg font-semibold mb-4">Node Dataset</h2>
-            <div className="grid grid-cols-4 text-sm font-semibold border-b pb-2">
-              <span>Node</span>
-              <span className="text-center">Energy</span>
-              <span className="text-center">RSSI</span>
-              <span className="text-center">Hop</span>
-            </div>
-            <div className="flex-1 overflow-y-auto mt-2 space-y-1 pr-2">
-              {dataset.map((r, i) => (
-                <div key={i} className="grid grid-cols-4 text-sm py-1 border-b">
-                  <span>{r.node}</span>
-                  <span className="text-center text-green-600 font-medium">
-                    {r.energy}%
-                  </span>
-                  <span className="text-center">{r.rssi}</span>
-                  <span className="text-center">{r.hop}</span>
-                </div>
-              ))}
-            </div>
-          </div> */}
-
           {/* ✅ MODERN NODE DATASET */}
           <div className="bg-white rounded-2xl shadow-lg p-6 h-[520px] flex flex-col">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold text-slate-800">Node Dataset</h2>
-              <span className="text-xs text-slate-500">{dataset.length} nodes</span>
+              <h2 className="text-lg font-semibold text-slate-800">
+                Node Dataset
+              </h2>
+              <span className="text-xs text-slate-500">
+                {dataset.length} nodes
+              </span>
             </div>
-             <div className="grid grid-cols-4 text-xs font-semibold text-slate-500 border-b pb-2">
+            <div className="grid grid-cols-4 text-xs font-semibold text-slate-500 border-b pb-2">
               <span>Node</span>
               <span className="text-center">Energy</span>
               <span className="text-center">RSSI</span>
               <span className="text-center">Hop</span>
             </div>
 
-             <div className="flex-1 overflow-y-auto mt-2 space-y-1 pr-2">
+            <div className="flex-1 overflow-y-auto mt-2 space-y-1 pr-2">
               {dataset.map((r, i) => (
                 <div
                   key={i}
@@ -262,29 +242,25 @@ export default function App() {
               />
 
               {!uploadedFile && (
-  <button
-    onClick={() => fileInputRef.current.click()}
-    className="w-full border rounded-lg p-2 mb-2 text-left text-slate-500"
-  >
-    Choose file
-  </button>
-)} 
-
-
-              {uploadedFile && (
-  <div className="flex justify-between items-center border rounded-lg p-2 mb-2">
-    <span className="text-sm truncate">
-      {uploadedFile.name}
-    </span>
                 <button
-                  onClick={removeFile}
-                  className="text-sm text-red-600 underline mb-4"
+                  onClick={() => fileInputRef.current.click()}
+                  className="w-full border rounded-lg p-2 mb-2 text-left text-slate-500"
                 >
-                  Delete selected file
+                  Choose file
                 </button>
-                </div>
               )}
 
+              {uploadedFile && (
+                <div className="flex justify-between items-center border rounded-lg p-2 mb-2">
+                  <span className="text-sm truncate">{uploadedFile.name}</span>
+                  <button
+                    onClick={removeFile}
+                    className="text-sm text-red-600 underline mb-4"
+                  >
+                    Delete selected file
+                  </button>
+                </div>
+              )}
 
               <label className="text-sm font-medium block mb-1">
                 Source Node
@@ -299,9 +275,7 @@ export default function App() {
                 ))}
               </select>
 
-              <label className="text-sm">
-                Number of Nodes: {nodeLimit}
-              </label>
+              <label className="text-sm">Number of Nodes: {nodeLimit}</label>
               <input
                 type="range"
                 min="5"
@@ -338,10 +312,7 @@ export default function App() {
         </div>
 
         {/* 🔹 TOPOLOGY */}
-        <div
-          ref={topologyRef}
-          className="bg-white rounded-xl shadow p-6"
-        >
+        <div ref={topologyRef} className="bg-white rounded-xl shadow p-6">
           <h2 className="text-lg font-semibold mb-4">
             Network Topology & Routing Path
           </h2>
@@ -349,22 +320,33 @@ export default function App() {
             nodes={limitedNodes}
             graph={filteredGraph}
             selected={source}
+            path={result}
           />
         </div>
 
         {/* 🔹 LIFETIME */}
-        <div
-          ref={lifetimeRef}
-          className="bg-white rounded-xl shadow p-6"
-        >
+        <div ref={lifetimeRef} className="bg-white rounded-xl shadow p-6">
           <h2 className="text-lg font-semibold mb-4">
             Network Lifetime Comparison
           </h2>
           <LineChart width={1100} height={280} data={chartData}>
-            <XAxis dataKey="p" />
-            <YAxis />
+            <XAxis dataKey="p" >
+               <Label
+      value="Packets Sent"
+      position="insideBottom"
+      offset={-20}
+    />
+    </XAxis>
+            <YAxis >
+              <Label
+      value="Alive Nodes"
+      angle={-90}
+      position="insideLeft"
+      style={{ textAnchor: "middle" }}
+    />
+    </YAxis>
             <Tooltip />
-            <Legend />
+            <Legend wrapperStyle={{ paddingTop: 30,}} />
             <Line type="monotone" dataKey="LEMR" stroke="#22c55e" dot />
             <Line type="monotone" dataKey="Random" stroke="#ef4444" dot />
             <Line type="monotone" dataKey="MinHop" stroke="#3b82f6" dot />
@@ -392,6 +374,7 @@ export default function App() {
     </div>
   );
 }
+
 
 
 

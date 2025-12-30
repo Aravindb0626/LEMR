@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import * as d3 from "d3";
 
-export default function ForceGraph({ nodes, graph, selected }) {
+export default function ForceGraph({ nodes, graph, selected, path }) {
   const ref = useRef();
 
   useEffect(() => {
@@ -19,34 +19,55 @@ export default function ForceGraph({ nodes, graph, selected }) {
       .attr("width", width)
       .attr("height", height);
 
-    const nodeData = nodes.map(n => ({ id: n }));
+    const nodeData = nodes.map((n) => ({ id: n }));
     const nodeSet = new Set(nodes);
 
     const linkData = Object.entries(graph).flatMap(([from, list]) =>
       list
-        .filter(nb => nodeSet.has(nb.id))
-        .map(nb => ({ source: from, target: nb.id }))
+        .filter((nb) => nodeSet.has(nb.id))
+        .map((nb) => ({
+          source: from,
+          target: nb.id,
+        }))
     );
 
-    const sim = d3.forceSimulation(nodeData)
-      .force("link", d3.forceLink(linkData).id(d => d.id).distance(120))
+    // ✅ BUILD PATH EDGE SET (CORRECT)
+    const pathEdges = new Set();
+    if (path && path.length > 1) {
+      for (let i = 0; i < path.length - 1; i++) {
+        pathEdges.add(`${path[i]}->${path[i + 1]}`);
+      }
+    }
+
+    const sim = d3
+      .forceSimulation(nodeData)
+      .force(
+        "link",
+        d3.forceLink(linkData).id((d) => d.id).distance(120)
+      )
       .force("charge", d3.forceManyBody().strength(-300))
       .force("center", d3.forceCenter(width / 2, height / 2));
 
-    const link = svg.append("g")
-      .attr("stroke", "#cbd5e1")
+    // 🔹 LINKS (VISIBLE + PATH HIGHLIGHT)
+    const link = svg
+      .append("g")
       .selectAll("line")
       .data(linkData)
       .enter()
-      .append("line");
+      .append("line")
+      .attr("stroke", "#cbd5e1")
+      .attr("stroke-width", 1.5)
+      .attr("opacity", 0.6);
 
-    const node = svg.append("g")
+    // 🔹 NODES (UNCHANGED)
+    const node = svg
+      .append("g")
       .selectAll("circle")
       .data(nodeData)
       .enter()
       .append("circle")
-      .attr("r", d => (d.id === "SINK" ? 18 : 13))
-      .attr("fill", d =>
+      .attr("r", (d) => (d.id === "SINK" ? 18 : 13))
+      .attr("fill", (d) =>
         d.id === "SINK"
           ? "#ef4444"
           : d.id === selected
@@ -54,27 +75,41 @@ export default function ForceGraph({ nodes, graph, selected }) {
           : "#38bdf8"
       );
 
-    const label = svg.append("g")
+    // 🔹 LABELS
+    const label = svg
+      .append("g")
       .selectAll("text")
       .data(nodeData)
       .enter()
       .append("text")
-      .text(d => d.id)
+      .text((d) => d.id)
       .attr("font-size", "11px")
       .attr("dx", 14)
       .attr("dy", 4);
 
+    // ✅ SINGLE TICK HANDLER (THIS FIXES EVERYTHING)
     sim.on("tick", () => {
       link
-        .attr("x1", d => d.source.x)
-        .attr("y1", d => d.source.y)
-        .attr("x2", d => d.target.x)
-        .attr("y2", d => d.target.y);
+        .attr("x1", (d) => d.source.x)
+        .attr("y1", (d) => d.source.y)
+        .attr("x2", (d) => d.target.x)
+        .attr("y2", (d) => d.target.y)
+        .attr("stroke", (d) =>
+          pathEdges.has(`${d.source.id}->${d.target.id}`)
+            ? "#000" // 🔥 highlighted path
+            : "#cbd5e1"
+        )
+        .attr("stroke-width", (d) =>
+          pathEdges.has(`${d.source.id}->${d.target.id}`) ? 2 : 1.5
+        )
+        .attr("opacity", (d) =>
+          pathEdges.has(`${d.source.id}->${d.target.id}`) ? 1 : 0.6
+        );
 
-      node.attr("cx", d => d.x).attr("cy", d => d.y);
-      label.attr("x", d => d.x).attr("y", d => d.y);
+      node.attr("cx", (d) => d.x).attr("cy", (d) => d.y);
+      label.attr("x", (d) => d.x).attr("y", (d) => d.y);
     });
-  }, [nodes, graph, selected]);
+  }, [nodes, graph, selected, path]);
 
   return <svg ref={ref} className="mx-auto" />;
 }
