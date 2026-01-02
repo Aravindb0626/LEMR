@@ -21,11 +21,11 @@ export default function App() {
   const fileInputRef = useRef(null); // 🆕 NEW
 
   useEffect(() => {
-    loadDefaultCSV(); // 🔴 CHANGED
+    loadDefaultCSV(); 
   }, []);
 
   function loadDefaultCSV() {
-    // 🆕 NEW
+    
     fetch("/data/neighbors.csv")
       .then((r) => r.text())
       .then((text) => parseCSV(text));
@@ -67,7 +67,7 @@ export default function App() {
   }
 
   function handleFileChange(e) {
-    // 🆕 NEW
+    
     const file = e.target.files[0];
     if (!file) return;
 

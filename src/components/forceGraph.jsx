@@ -1,5 +1,3 @@
-
-
 import { useEffect, useRef } from "react";
 import * as d3 from "d3";
 
@@ -31,7 +29,6 @@ export default function ForceGraph({ nodes, graph, selected, path }) {
         }))
     );
 
-    // ✅ BUILD PATH EDGE SET (CORRECT)
     const pathEdges = new Set();
     if (path && path.length > 1) {
       for (let i = 0; i < path.length - 1; i++) {
@@ -48,7 +45,6 @@ export default function ForceGraph({ nodes, graph, selected, path }) {
       .force("charge", d3.forceManyBody().strength(-300))
       .force("center", d3.forceCenter(width / 2, height / 2));
 
-    // 🔹 LINKS (VISIBLE + PATH HIGHLIGHT)
     const link = svg
       .append("g")
       .selectAll("line")
@@ -59,7 +55,6 @@ export default function ForceGraph({ nodes, graph, selected, path }) {
       .attr("stroke-width", 1.5)
       .attr("opacity", 0.6);
 
-    // 🔹 NODES (UNCHANGED)
     const node = svg
       .append("g")
       .selectAll("circle")
@@ -75,7 +70,7 @@ export default function ForceGraph({ nodes, graph, selected, path }) {
           : "#38bdf8"
       );
 
-    // 🔹 LABELS
+    //  LABELS
     const label = svg
       .append("g")
       .selectAll("text")
@@ -87,7 +82,6 @@ export default function ForceGraph({ nodes, graph, selected, path }) {
       .attr("dx", 14)
       .attr("dy", 4);
 
-    // ✅ SINGLE TICK HANDLER (THIS FIXES EVERYTHING)
     sim.on("tick", () => {
       link
         .attr("x1", (d) => d.source.x)
@@ -96,7 +90,7 @@ export default function ForceGraph({ nodes, graph, selected, path }) {
         .attr("y2", (d) => d.target.y)
         .attr("stroke", (d) =>
           pathEdges.has(`${d.source.id}->${d.target.id}`)
-            ? "#000" // 🔥 highlighted path
+            ? "#000" 
             : "#cbd5e1"
         )
         .attr("stroke-width", (d) =>
